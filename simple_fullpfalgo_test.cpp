@@ -10,12 +10,14 @@
 
 int main() {
 
-    // input format: could be random or coming from simulation
-    //RandomPFInputs inputs(37); // 37 is a good random number
+    // input format
     DiscretePFInputs inputs("regions_TTbar_PU140.dump");
     
     // input TP objects
-    HadCaloObj calo[NCALO]; EmCaloObj emcalo[NEMCALO]; TkObj track[NTRACK]; z0_t hwZPV;
+    HadCaloObj calo[NCALO]; 
+    EmCaloObj emcalo[NEMCALO]; 
+    TkObj track[NTRACK]; 
+    z0_t hwZPV;
     HadCaloObj calo_subem[NCALO], calo_subem_ref[NCALO]; 
     MuObj mu[NMU];
 
@@ -85,11 +87,14 @@ int main() {
         // initialize
         for (int i = 0; i < CTP7_NCHANN_IN; ++i) { data_in[i] = 0; }
         for (int i = 0; i < CTP7_NCHANN_OUT; ++i) { data_out[i] = 0; }
-        mp7wrapped_pack_in(emcalo, calo, track, mu, data_in);
+//        mp7wrapped_pack_in(emcalo, calo, track, mu, data_in);
+        mp7wrapped_pack_in(track, mu, data_in);
         MP7_TOP_FUNC(data_in, data_out);
-        mp7wrapped_unpack_out(data_out, outch, outpho, outne, outmupf);
-    
-        MP7_REF_FUNC(emcalo, calo, track, mu, outch_ref, outpho_ref, outne_ref, outmupf_ref);
+//        mp7wrapped_unpack_out(data_out, outch, outpho, outne, outmupf);
+        mp7wrapped_unpack_out(data_out, outmupf);
+
+//        MP7_REF_FUNC(emcalo, calo, track, mu, outch_ref, outpho_ref, outne_ref, outmupf_ref);
+        MP7_REF_FUNC(track, mu, outmupf_ref);
         // write out patterns for CTP7 board hardware or simulator test
         serInPatterns4(data_in,CTP7_NCHANN_IN); serOutPatterns4(data_out,CTP7_NCHANN_OUT);       
 
@@ -115,15 +120,6 @@ int main() {
         for (int i = 0; i < NTRACK; ++i) {
             if (!pf_equals(outch_ref[i], outch[i], "PF Charged", i)) errors++;
             if (outch_ref[i].hwPt > 0) { ntot++; nch++; }
-        }
-        // check photon 
-        for (int i = 0; i < NPHOTON; ++i) {
-            if (!pf_equals(outpho_ref[i], outpho[i], "Photon", i)) errors++;
-            if (outpho_ref[i].hwPt > 0) { ntot++; npho++; }
-        }
-        for (int i = 0; i < NSELCALO; ++i) {
-            if (!pf_equals(outne_ref[i], outne[i], "PF Neutral", i)) errors++;
-            if (outne_ref[i].hwPt > 0) { ntot++; nneu++; }
         }
         for (int i = 0; i < NMU; ++i) {
             if (!pf_equals(outmupf_ref[i], outmupf[i], "PF Muon", i)) errors++;

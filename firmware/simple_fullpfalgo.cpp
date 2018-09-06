@@ -6,10 +6,6 @@
 #include <cstdio>
 #endif
 
-typedef ap_uint<7> tk2em_dr_t;
-typedef ap_uint<10> tk2calo_dr_t;
-typedef ap_uint<10> em2calo_dr_t;
-typedef ap_uint<12> tk2calo_dq_t;
 
 int dr2_int(etaphi_t eta1, etaphi_t phi1, etaphi_t eta2, etaphi_t phi2) {
     etaphi_t deta = (eta1-eta2);
@@ -55,7 +51,6 @@ void ptsort_hwopt(T in[NIn], T out[NOut]) {
                 }
             }
         }
-
     }
     for (int iout = 0; iout < NOut; ++iout) {
         out[iout] = tmp[iout];
@@ -97,7 +92,9 @@ void spfph_mu2trk_linkstep(MuObj mu[NMU], pt_t mu_track_dptval[NMU][NTRACK], ap_
         for (int it = 0; it < NTRACK; ++it) {
             pt_t mydpt = mu_track_dptval[im][it];
             bool link = (mydpt < (mu[im].hwPt >> 1));
-            for (int j = 0; j < NTRACK; ++j) {
+
+            // confirm that this track has the smallest Delta(pT) value to link with muon
+            for (int j=0; j < NTRACK; ++j) {
                 if (it <= j) link = link && (mu_track_dptval[im][j] >= mydpt);
                 else         link = link && (mu_track_dptval[im][j] >  mydpt);
             }   
@@ -153,7 +150,6 @@ void spfph_mualgo(MuObj mu[NMU], TkObj track[NTRACK], ap_uint<NMU> mu_track_link
 // PF Algos
 //-------------------------------------------------------
 
-//void pfalgo3_full(EmCaloObj calo[NEMCALO], HadCaloObj hadcalo[NCALO], TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outch[NTRACK], PFNeutralObj outpho[NPHOTON], PFNeutralObj outne[NSELCALO], PFChargedObj outmu[NMU]) {
 void pfalgo3_full(TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outmu[NMU]) {
     /* Build PF objects */
     #pragma HLS ARRAY_PARTITION variable=track complete
@@ -166,8 +162,9 @@ void pfalgo3_full(TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outmu[NMU]) {
     // TK-MU Linking
     ap_uint<NMU> mu_track_link_bit[NTRACK];
     #pragma HLS ARRAY_PARTITION variable=mu_track_link_bit complete
+
     bool isMu[NTRACK];
-    for (int it=0; it<NTRACK; ++it) { isMu[it]=0; }
+    for (int it=0; it<NTRACK; ++it) { isMu[it]=0; }  // initialize matches to 0
 
     spfph_mutrk_link(mu, track, mu_track_link_bit);
     spfph_mualgo(mu, track, mu_track_link_bit, outmu, isMu);
@@ -207,10 +204,9 @@ void mp7wrapped_unpack_in(MP7DataWord data[MP7_NCHANN], TkObj track[NTRACK], MuO
     mp7_unpack<NMU,MUOFFS>(data, mu);
 }
 
-void mp7wrapped_pack_out( PFChargedObj pfch[NTRACK], PFChargedObj pfmu[NMU], MP7DataWord data[MP7_NCHANN]) {
+void mp7wrapped_pack_out( PFChargedObj pfmu[NMU], MP7DataWord data[MP7_NCHANN]) {
     /* MP7 pack outputs */
     #pragma HLS ARRAY_PARTITION variable=data complete
-    #pragma HLS ARRAY_PARTITION variable=pfch complete
     #pragma HLS ARRAY_PARTITION variable=pfmu complete
 
     // pack outputs
@@ -218,11 +214,6 @@ void mp7wrapped_pack_out( PFChargedObj pfch[NTRACK], PFChargedObj pfmu[NMU], MP7
     #define PHOOFFS 2*NTRACK
     #define NHOFFS 2*NPHOTON+PHOOFFS
     #define PFMUOFFS 2*NSELCALO+NHOFFS
-
-    for (unsigned int i = 0; i < NTRACK; ++i) {
-        data[2*i+0] = ( pfch[i].hwId,  pfch[i].hwPt );
-        data[2*i+1] = ( pfch[i].hwZ0, pfch[i].hwPhi, pfch[i].hwEta );
-    }
 
     for (unsigned int i = 0; i < NMU; ++i) {
         data[2*i+0+PFMUOFFS] = ( pfmu[i].hwId, pfmu[i].hwPt );
@@ -232,24 +223,17 @@ void mp7wrapped_pack_out( PFChargedObj pfch[NTRACK], PFChargedObj pfmu[NMU], MP7
     return;
 }
 
-void mp7wrapped_unpack_out( MP7DataWord data[MP7_NCHANN], PFChargedObj pfch[NTRACK], PFChargedObj pfmu[NMU]) {
+void mp7wrapped_unpack_out( MP7DataWord data[MP7_NCHANN], PFChargedObj pfmu[NMU]) {
     /* MP7 unpack outputs */
     #pragma HLS ARRAY_PARTITION variable=data complete
-    #pragma HLS ARRAY_PARTITION variable=pfch complete
     #pragma HLS ARRAY_PARTITION variable=pfmu complete
+
     // unpack outputs
     assert(2*NTRACK + 2*NPHOTON + 2*NSELCALO + 2*NMU <= MP7_NCHANN);
     #define PHOOFFS 2*NTRACK
     #define NHOFFS 2*NPHOTON+PHOOFFS
     #define PFMUOFFS 2*NSELCALO+NHOFFS
 
-    for (unsigned int i = 0; i < NTRACK; ++i) {
-        pfch[i].hwPt  = data[2*i+0](15, 0);
-        pfch[i].hwId  = data[2*i+0](18,16);
-        pfch[i].hwEta = data[2*i+1](9, 0);
-        pfch[i].hwPhi = data[2*i+1](19,10);
-        pfch[i].hwZ0  = data[2*i+1](29,20);
-    }
     for (unsigned int i = 0; i < NMU; ++i) {
         pfmu[i].hwPt  = data[2*i+0+PFMUOFFS](15, 0);
         pfmu[i].hwId  = data[2*i+0+PFMUOFFS](18,16);
@@ -275,14 +259,12 @@ void mp7wrapped_pfalgo3_full(MP7DataWord input[MP7_NCHANN], MP7DataWord output[M
     #pragma HLS ARRAY_PARTITION variable=track complete
     #pragma HLS ARRAY_PARTITION variable=mu complete
 
-    PFChargedObj pfch[NTRACK]; 
     PFChargedObj pfmu[NMU];
-    #pragma HLS ARRAY_PARTITION variable=pfch complete
     #pragma HLS ARRAY_PARTITION variable=pfmu complete
 
     mp7wrapped_unpack_in(input, track, mu);
-    pfalgo3_full(track, mu, pfch, pfmu);
-    mp7wrapped_pack_out(pfch, pfmu, output);
+    pfalgo3_full(track, mu, pfmu);
+    mp7wrapped_pack_out(pfmu, output);
 
     return;
 }

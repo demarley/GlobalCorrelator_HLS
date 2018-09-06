@@ -190,7 +190,8 @@ void pfalgo3_em_ref(EmCaloObj emcalo[NEMCALO], HadCaloObj hadcalo[NCALO], TkObj 
     }
 }
 
-void pfalgo3_full_ref(EmCaloObj emcalo[NEMCALO], HadCaloObj hadcalo[NCALO], TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outch[NTRACK], PFNeutralObj outpho[NPHOTON], PFNeutralObj outne[NSELCALO], PFChargedObj outmu[NMU]) {
+//void pfalgo3_full_ref(EmCaloObj emcalo[NEMCALO], HadCaloObj hadcalo[NCALO], TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outch[NTRACK], PFNeutralObj outpho[NPHOTON], PFNeutralObj outne[NSELCALO], PFChargedObj outmu[NMU]) {
+void pfalgo3_full_ref(TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outmu[NMU]) {
 
     if (g_debug_) {
 #ifdef FASTPUPPI_NTUPLERPRODUCER_DISCRETEPFINPUTS_MORE
@@ -199,16 +200,6 @@ void pfalgo3_full_ref(EmCaloObj emcalo[NEMCALO], HadCaloObj hadcalo[NCALO], TkOb
             printf("FW  \t track %3d: pt %8d [ %7.2f ]  calo eta %+7d [ %+5.2f ]  calo phi %+7d [ %+5.2f ]  calo ptErr %6d [ %7.2f ] \n", 
                                 i, tk.hwPt, tk.floatPt(), tk.hwEta, tk.floatEta(), tk.hwPhi, tk.floatPhi(), tk.hwCaloPtErr, tk.floatCaloPtErr());
         }
-        for (int i = 0; i < NEMCALO; ++i) { if (emcalo[i].hwPt == 0) continue;
-            l1tpf_int::CaloCluster em; fw2dpf::convert(emcalo[i], em); 
-            printf("FW  \t EM    %3d: pt %8d [ %7.2f ]  calo eta %+7d [ %+5.2f ]  calo phi %+7d [ %+5.2f ]  calo ptErr %6d [ %7.2f ] \n", 
-                                i, em.hwPt, em.floatPt(), em.hwEta, em.floatEta(), em.hwPhi, em.floatPhi(), em.hwPtErr, em.floatPtErr());
-        } 
-        for (int i = 0; i < NCALO; ++i) { if (hadcalo[i].hwPt == 0) continue;
-            l1tpf_int::CaloCluster calo; fw2dpf::convert(hadcalo[i], calo); 
-            printf("FW  \t calo  %3d: pt %8d [ %7.2f ]  calo eta %+7d [ %+5.2f ]  calo phi %+7d [ %+5.2f ]  calo emPt %7d [ %7.2f ]   isEM %d \n", 
-                                i, calo.hwPt, calo.floatPt(), calo.hwEta, calo.floatEta(), calo.hwPhi, calo.floatPhi(), calo.hwEmPt, calo.floatEmPt(), calo.isEM);
-        } 
         for (int i = 0; i < NMU; ++i) { if (mu[i].hwPt == 0) continue;
             l1tpf_int::Muon muon; fw2dpf::convert(mu[i], muon); 
             printf("FW  \t muon  %3d: pt %8d [ %7.2f ]  muon eta %+7d [ %+5.2f ]  muon phi %+7d [ %+5.2f ]   \n", 
@@ -264,91 +255,5 @@ void pfalgo3_full_ref(EmCaloObj emcalo[NEMCALO], HadCaloObj hadcalo[NCALO], TkOb
         }
     }
 
-    ////////////////////////////////////////////////////
-    // TK-EM Linking
-    bool isEle[NTRACK];
-    HadCaloObj hadcalo_subem[NCALO];
-    pfalgo3_em_ref(emcalo, hadcalo, track, isEle, isMu, outpho, hadcalo_subem);
-
-    ////////////////////////////////////////////////////
-    // TK-HAD Linking
-
-    // initialize sum track pt
-    pt_t calo_sumtk[NCALO], calo_subpt[NCALO];
-    int  calo_sumtkErr2[NCALO];
-    for (int ic = 0; ic < NCALO; ++ic) { calo_sumtk[ic] = 0;  calo_sumtkErr2[ic] = 0;}
-
-    // initialize good track bit
-    bool track_good[NTRACK];
-    for (int it = 0; it < NTRACK; ++it) { 
-        track_good[it] = (track[it].hwPt < (track[it].hwTightQuality ? TKPT_MAX_TIGHT : TKPT_MAX_LOOSE) || isEle[it] || isMu[it]); 
-    }
-
-    // initialize output
-    for (int ipf = 0; ipf < NTRACK; ++ipf) { outch[ipf].hwPt = 0; outch[ipf].hwEta = 0; outch[ipf].hwPhi = 0; outch[ipf].hwId = 0; outch[ipf].hwZ0 = 0; }
-    for (int ipf = 0; ipf < NSELCALO; ++ipf) { outne[ipf].hwPt = 0; outne[ipf].hwEta = 0; outne[ipf].hwPhi = 0; outne[ipf].hwId = 0; }
-
-    // for each track, find the closest calo
-    for (int it = 0; it < NTRACK; ++it) {
-        if (track[it].hwPt > 0 && !isEle[it] && !isMu[it]) {
-            int  ibest = best_match_with_pt_ref<NCALO,DR2MAX,HadCaloObj>(hadcalo_subem, track[it]);
-            //int  ibest = best_match_ref<NCALO,DR2MAX,true,HadCaloObj>(hadcalo_subem, track[it]);
-            if (ibest != -1) {
-                if (g_debug_) printf("FW  \t track  %3d pt %7d matched to calo' %3d pt %7d\n", it, int(track[it].hwPt), ibest, int(hadcalo_subem[ibest].hwPt));
-                track_good[it] = 1;
-                calo_sumtk[ibest]    += track[it].hwPt;
-                calo_sumtkErr2[ibest] += sqr(track[it].hwPtErr);
-            }
-        }
-    }
-
-    for (int ic = 0; ic < NCALO; ++ic) {
-        if (calo_sumtk[ic] > 0) {
-            pt_t ptdiff = hadcalo_subem[ic].hwPt - calo_sumtk[ic];
-            int sigmamult = (calo_sumtkErr2[ic] + (calo_sumtkErr2[ic] >> 1)); // this multiplies by 1.5 = sqrt(1.5)^2 ~ (1.2)^2
-            if (g_debug_ && (hadcalo_subem[ic].hwPt > 0)) {
-#ifdef FASTPUPPI_NTUPLERPRODUCER_DISCRETEPFINPUTS_MORE
-                l1tpf_int::CaloCluster floatcalo; fw2dpf::convert(hadcalo_subem[ic], floatcalo); 
-                printf("FW  \t calo'  %3d pt %7d [ %7.2f ] eta %+7d [ %+5.2f ] has a sum track pt %7d, difference %7d +- %.2f \n",
-                            ic, int(hadcalo_subem[ic].hwPt), floatcalo.floatPt(), int(hadcalo_subem[ic].hwEta), floatcalo.floatEta(), 
-                                int(calo_sumtk[ic]), int(ptdiff), std::sqrt(float(int(calo_sumtkErr2[ic]))));
-#endif
-                        
-            }
-            if (ptdiff > 0 && ptdiff*ptdiff > sigmamult) {
-                calo_subpt[ic] = ptdiff;
-            } else {
-                calo_subpt[ic] = 0;
-            }
-        } else {
-            calo_subpt[ic] = hadcalo_subem[ic].hwPt;
-        }
-        if (g_debug_ && (hadcalo_subem[ic].hwPt > 0)) printf("FW  \t calo'  %3d pt %7d ---> %7d \n", ic, int(hadcalo_subem[ic].hwPt), int(calo_subpt[ic]));
-    }
-
-    // copy out charged hadrons
-    for (int it = 0; it < NTRACK; ++it) {
-        if (track_good[it]) {
-            outch[it].hwPt = track[it].hwPt;
-            outch[it].hwEta = track[it].hwEta;
-            outch[it].hwPhi = track[it].hwPhi;
-            outch[it].hwZ0 = track[it].hwZ0;
-            outch[it].hwId  = isEle[it] ? PID_Electron : (isMu[it] ? PID_Muon : PID_Charged);
-        }
-    }
-
-    // copy out neutral hadrons
-    PFNeutralObj outne_all[NCALO];
-    for (int ipf = 0; ipf < NCALO; ++ipf) { outne_all[ipf].hwPt = 0; outne_all[ipf].hwEta = 0; outne_all[ipf].hwPhi = 0; outne_all[ipf].hwId = 0; }
-    for (int ic = 0; ic < NCALO; ++ic) {
-        if (calo_subpt[ic] > 0) {
-            outne_all[ic].hwPt  = calo_subpt[ic];
-            outne_all[ic].hwEta = hadcalo_subem[ic].hwEta;
-            outne_all[ic].hwPhi = hadcalo_subem[ic].hwPhi;
-            outne_all[ic].hwId  = PID_Neutral;
-        }
-    }
-
-    ptsort_ref<PFNeutralObj,NCALO,NSELCALO>(outne_all, outne);
-
+    return;
 }
