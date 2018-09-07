@@ -34,10 +34,13 @@ int main() {
     MP7PatternSerializer serInPatterns3( "mp7_input_patterns_nomux.txt");  // 
     MP7PatternSerializer serOutPatterns3("mp7_output_patterns_nomux.txt"); // ,
 #endif
+
 #if defined(TESTCTP7)
-    CTP7PatternSerializer serInPatterns4( "ctp7_input_patterns_nomux.txt",CTP7_NCHANN_IN, true);  // 
-    CTP7PatternSerializer serOutPatterns4("ctp7_output_patterns_nomux.txt",CTP7_NCHANN_OUT, false); // fill the rest of the lines with empty events for now
+    CTP7PatternSerializer serInPatterns4( "ctp7_input_patterns_nomux.txt",CTP7_NCHANN_IN, true);
+    CTP7PatternSerializer serOutPatterns4("ctp7_output_patterns_nomux.txt",CTP7_NCHANN_OUT, false);
+    // fill the rest of the lines with empty events for now
 #endif
+
     HumanReadablePatternSerializer serHR("human_readable_patterns.txt");
     HumanReadablePatternSerializer debugHR("-"); // this will print on stdout, we'll use it for errors
 
@@ -85,16 +88,15 @@ int main() {
 #elif defined(TESTCTP7) // Full PF, with CTP7 wrapping
         MP7DataWord data_in[CTP7_NCHANN_IN], data_out[CTP7_NCHANN_OUT];
         // initialize
-        for (int i = 0; i < CTP7_NCHANN_IN; ++i) { data_in[i] = 0; }
-        for (int i = 0; i < CTP7_NCHANN_OUT; ++i) { data_out[i] = 0; }
-//        mp7wrapped_pack_in(emcalo, calo, track, mu, data_in);
+        for (int i=0; i<CTP7_NCHANN_IN; ++i) { data_in[i] = 0; }
+        for (int i=0; i<CTP7_NCHANN_OUT; ++i) { data_out[i] = 0; }
+
         mp7wrapped_pack_in(track, mu, data_in);
         MP7_TOP_FUNC(data_in, data_out);
-//        mp7wrapped_unpack_out(data_out, outch, outpho, outne, outmupf);
         mp7wrapped_unpack_out(data_out, outmupf);
 
-//        MP7_REF_FUNC(emcalo, calo, track, mu, outch_ref, outpho_ref, outne_ref, outmupf_ref);
         MP7_REF_FUNC(track, mu, outmupf_ref);
+
         // write out patterns for CTP7 board hardware or simulator test
         serInPatterns4(data_in,CTP7_NCHANN_IN); serOutPatterns4(data_out,CTP7_NCHANN_OUT);       
 
@@ -114,13 +116,10 @@ int main() {
 
         // -----------------------------------------
         // validation against the reference algorithm
-        int errors = 0; int ntot = 0, npho = 0, nch = 0, nneu = 0, nmu = 0;
+        int errors = 0; 
+        int ntot = 0;
+        int nmu = 0;
 
-        // check charged hadrons
-        for (int i = 0; i < NTRACK; ++i) {
-            if (!pf_equals(outch_ref[i], outch[i], "PF Charged", i)) errors++;
-            if (outch_ref[i].hwPt > 0) { ntot++; nch++; }
-        }
         for (int i = 0; i < NMU; ++i) {
             if (!pf_equals(outmupf_ref[i], outmupf[i], "PF Muon", i)) errors++;
             if (outmupf_ref[i].hwPt > 0) { ntot++; nmu++; }
@@ -132,10 +131,11 @@ int main() {
             printf("Reference output: \n"); debugHR.dump_outputs(outch_ref, outpho_ref, outne_ref, outmupf_ref);
             printf("Current output: \n"); debugHR.dump_outputs(outch, outpho, outne, outmupf);
             return 1;
-        } else {
-            printf("Passed test %d (%d, %d, %d, %d)\n", test, ntot, nch, npho, nneu);
         }
-
+        else {
+            printf("Passed test %d (%d)\n", test, nmu);
+        }
     }
+
     return 0;
 }
