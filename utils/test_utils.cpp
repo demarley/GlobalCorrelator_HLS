@@ -60,14 +60,16 @@ bool pf_equals(const PFChargedObj &out_ref, const PFChargedObj &out, const char 
     if (out_ref.hwPt == 0) {
         ret = (out.hwPt == 0);
     } else {
-        ret = (out_ref.hwPt == out.hwPt && out_ref.hwEta == out.hwEta && out_ref.hwPhi == out.hwPhi && out_ref.hwId  == out.hwId && out_ref.hwZ0  == out.hwZ0);
+        ret = (out_ref.hwPt == out.hwPt && 
+               out_ref.hwEta == out.hwEta && 
+               out_ref.hwPhi == out.hwPhi &&  
+               out_ref.hwZ0  == out.hwZ0);
     }
     if  (!ret) {
-        printf("Mismatch at %s[%d] ref vs test, hwPt % 7d % 7d   hwEta %+7d %+7d   hwPhi %+7d %+7d   hwId %1d %1d      hwZ0 %+7d %+7d   \n", what, idx,
+        printf("Mismatch at %s[%d] ref vs test, hwPt % 7d % 7d   hwEta %+7d %+7d   hwPhi %+7d %+7d    hwZ0 %+7d %+7d   \n", what, idx,
                 int(out_ref.hwPt), int(out.hwPt),
                 int(out_ref.hwEta), int(out.hwEta),
                 int(out_ref.hwPhi), int(out.hwPhi),
-                int(out_ref.hwId), int(out.hwId),
                 int(out_ref.hwZ0), int(out.hwZ0));
     }
     return ret;

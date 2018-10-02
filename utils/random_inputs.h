@@ -10,8 +10,8 @@ public:
 		const float ETAPHI_SCALE = (4*180/M_PI);
 		const float Z0_SCALE = 20.;
 
-		int ncharged = (rand() % NTRACK/2) + NTRACK/2;
-		int nneutral = (rand() % ((3*NCALO)/4));
+		int ncharged = 0;
+		int nneutral = 0;
 		for (int i = 1; i < nneutral && i < NCALO; i += 2) {
 			float pt = (rand()/float(RAND_MAX))*80+1, eta = (rand()/float(RAND_MAX))*2.0-1.0, phi = (rand()/float(RAND_MAX))*2.0-1.0;
 			calo[i].hwPt  = pt * PT_SCALE;

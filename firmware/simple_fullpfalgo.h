@@ -2,6 +2,8 @@
 #define SIMPLE_PFALGO3_H
 
 #include "data.h"
+//#include "algos.h"
+#include "prop.h"
 
 bool match_box(etaphi_t eta1, etaphi_t phi1, etaphi_t eta2, etaphi_t phi2, etaphi_t boxSize) ;
 etaphi_t dr_box(etaphi_t eta1, etaphi_t phi1, etaphi_t eta2, etaphi_t phi2) ;
@@ -19,7 +21,8 @@ void mp7wrapped_pfalgo3_full(MP7DataWord input[MP7_NCHANN], MP7DataWord output[M
 
 #define PFALGO3_DR2MAX_TK_CALO 756
 #define PFALGO3_DR2MAX_EM_CALO 525
-#define PFALGO3_DR2MAX_TK_MU   2101
+//#define PFALGO3_DR2MAX_TK_MU   2101
+#define PFALGO3_DR2MAX_TK_MU   0.04
 #define PFALGO3_DR2MAX_TK_EM   84
 #define PFALGO3_TK_MAXINVPT_LOOSE    40
 #define PFALGO3_TK_MAXINVPT_TIGHT    80

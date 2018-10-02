@@ -19,11 +19,6 @@ namespace fw2dpf {
         pf.hwVtxPhi = src.hwPhi; // before propagation
         pf.track = track; // FIXME: ok only as long as there is a 1-1 mapping
         pf.cluster.hwPt = 0;
-        switch(src.hwId) {
-            case PID_Electron: pf.hwId =  1; break;
-            case PID_Muon: pf.hwId =  4; break;
-            default: pf.hwId = 0; break;
-        };
         pf.hwStatus = 0;
         out.push_back(pf);
     }

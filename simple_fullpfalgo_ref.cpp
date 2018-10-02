@@ -222,7 +222,9 @@ void pfalgo3_full_ref(TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outmu[NMU
     // for (int im = 0; im < NMU; ++im) { mu_good[im] = (mu[im].hwPt < TKPT_MAX); }
 
     // initialize output
-    for (int ipf = 0; ipf < NMU; ++ipf) { outmu[ipf].hwPt = 0; outmu[ipf].hwEta = 0; outmu[ipf].hwPhi = 0; outmu[ipf].hwId  = 0; outmu[ipf].hwZ0  = 0; }
+    for (int ipf = 0; ipf < NMU; ++ipf) { 
+        outmu[ipf].hwPt = 0; outmu[ipf].hwEta = 0; outmu[ipf].hwPhi = 0; outmu[ipf].hwZ0  = 0;
+    }
 
     bool isMu[NTRACK];
     for (int it = 0; it < NTRACK; ++it) { isMu[it] = 0; } // initialize
@@ -245,7 +247,6 @@ void pfalgo3_full_ref(TkObj track[NTRACK], MuObj mu[NMU], PFChargedObj outmu[NMU
                 outmu[im].hwPt = track[ibest].hwPt;
                 outmu[im].hwEta = track[ibest].hwEta;
                 outmu[im].hwPhi = track[ibest].hwPhi;
-                outmu[im].hwId  = PID_Muon;
                 outmu[im].hwZ0 = track[ibest].hwZ0;      
                 isMu[ibest] = 1;
                 if (g_debug_) printf("FW  \t muon %3d linked to track %3d \n", im, ibest);

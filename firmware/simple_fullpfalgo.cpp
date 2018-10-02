@@ -7,6 +7,20 @@
 #endif
 
 
+
+feta_t deltaR(MuObj mu, TkObj tk){
+    /* Calculate eta and phi and deltaR match */
+    feta_t tkEta       = tk.hwPropEta*INVETA_CONVERSION;
+    fphiglobal_t tkPhi = normalizePhi(tk.hwPropPhi*INVPHI_CONVERSION);
+
+    feta_m muEta = (1- 2*std::bitset<9>(mu.hwEta)[8]) * from_twos_complement<9>(mu.hwEta) * MUONETA_CONVERSION;
+    fphi_m muPhi = normalizePhi(mu.hwPhi * MUONPHI_CONVERSION);
+
+    feta_t dr = deltaR_hw( muEta,muPhi,tkEta,tkPhi );
+    return dr;
+}
+
+
 int dr2_int(etaphi_t eta1, etaphi_t phi1, etaphi_t eta2, etaphi_t phi2) {
     etaphi_t deta = (eta1-eta2);
     etaphi_t dphi = (phi1-phi2);
@@ -66,37 +80,48 @@ void init_dr2max_times_pterr2_inv(int vals[512]) {
     }
 }
 
+
 //-------------------------------------------------------
 // TK-MU Algos
 //-------------------------------------------------------
+void spfph_trkprop(TkObj track[NTRACK]){
+    /* Propagate tracks to 2nd muon station */
+    #pragma HLS ARRAY_PARTITION variable=track complete
+    for (int tk=0; tk<NTRACK; ++tk){
+        etaphiglobal_t etaphi;
+        prop_hw(track[tk], etaphi);
+        track[tk].hwPropEta = etaphi.first;
+        track[tk].hwPropPhi = etaphi.second;
+    }
+    return;
+}
 
-void spfph_mu2trk_dptvals(MuObj mu[NMU], TkObj track[NTRACK], pt_t mu_track_dptval[NMU][NTRACK]) {
+void spfph_mu2trk_drvals(MuObj mu[NMU], TkObj track[NTRACK], feta_t mu_track_drval[NMU][NTRACK]) {
     const ap_uint<12> DR2MAX = PFALGO3_DR2MAX_TK_MU;
     for (int im = 0; im < NMU; ++im) {
         for (int it = 0; it < NTRACK; ++it) {
-            pt_t dpt = mu[im].hwPt - track[it].hwPt;
-            if (dr2_int_cap<12>(mu[im].hwEta, mu[im].hwPhi, track[it].hwEta, track[it].hwPhi, DR2MAX) < DR2MAX) {
-                mu_track_dptval[im][it] = (dpt > 0 ? dpt : pt_t(-dpt));
-            } else {
-                mu_track_dptval[im][it] = mu[im].hwPt >> 1;
-            }
+            feta_t dr = deltaR(mu[im],track[it]);
+            if (dr<DR2MAX)
+                mu_track_drval[im][it] = (dr > 0 ? dr : feta_t(-dr));
+            else
+                mu_track_drval[im][it] = DR2MAX;
         } // end loop over tracks
     } // end loop over muons
 
     return;
 }
 
-void spfph_mu2trk_linkstep(MuObj mu[NMU], pt_t mu_track_dptval[NMU][NTRACK], ap_uint<NMU> mu_track_link_bit[NTRACK]) {
+void spfph_mu2trk_linkstep(MuObj mu[NMU], feta_t mu_track_drval[NMU][NTRACK], ap_uint<NMU> mu_track_link_bit[NTRACK]) {
     /* Link tracks to muons */
     for (int im = 0; im < NMU; ++im) {
         for (int it = 0; it < NTRACK; ++it) {
-            pt_t mydpt = mu_track_dptval[im][it];
-            bool link = (mydpt < (mu[im].hwPt >> 1));
+            feta_t mydr = mu_track_drval[im][it];
+            bool link = (mydr < 0.2);
 
-            // confirm that this track has the smallest Delta(pT) value to link with muon
+            // confirm that this track has the smallest DeltaR value to link with muon
             for (int j=0; j < NTRACK; ++j) {
-                if (it <= j) link = link && (mu_track_dptval[im][j] >= mydpt);
-                else         link = link && (mu_track_dptval[im][j] >  mydpt);
+                if (it <= j) link = link && (mu_track_drval[im][j] >= mydr);
+                else         link = link && (mu_track_drval[im][j] >  mydr);
             }   
             mu_track_link_bit[it][im] = link;
         } // end loop over tracks
@@ -111,11 +136,14 @@ void spfph_mutrk_link(MuObj mu[NMU], TkObj track[NTRACK], ap_uint<NMU> mu_track_
     #pragma HLS ARRAY_PARTITION variable=track complete
     #pragma HLS ARRAY_PARTITION variable=mu_track_link_bit complete dim=0
 
-    pt_t dptvals[NMU][NTRACK];
-    #pragma HLS ARRAY_PARTITION variable=dptvals complete dim=0
+    feta_t drvals[NMU][NTRACK];
+    #pragma HLS ARRAY_PARTITION variable=drvals complete dim=0
 
-    spfph_mu2trk_dptvals(mu, track, dptvals);
-    spfph_mu2trk_linkstep(mu, dptvals, mu_track_link_bit);
+    etaphiglobal_t etaphi;
+
+    spfph_trkprop(track);
+    spfph_mu2trk_drvals(mu, track, drvals);
+    spfph_mu2trk_linkstep(mu, drvals, mu_track_link_bit);
 
     return;
 }
@@ -133,14 +161,12 @@ void spfph_mualgo(MuObj mu[NMU], TkObj track[NTRACK], ap_uint<NMU> mu_track_link
             pfmuout[im].hwPt  = track[ibest].hwPt;
             pfmuout[im].hwEta = track[ibest].hwEta;
             pfmuout[im].hwPhi = track[ibest].hwPhi;
-            pfmuout[im].hwId  = PID_Muon;
             pfmuout[im].hwZ0  = track[ibest].hwZ0;
             isMu[ibest] = 1;
         } else {
             pfmuout[im].hwPt  = 0;
             pfmuout[im].hwEta = 0;
             pfmuout[im].hwPhi = 0;
-            pfmuout[im].hwId  = 0;
             pfmuout[im].hwZ0  = 0;
         }
     }
@@ -181,9 +207,8 @@ void mp7wrapped_pack_in(TkObj track[NTRACK], MuObj mu[NMU], MP7DataWord data[MP7
 
     // pack inputs
     assert(2*NEMCALO + 2*NTRACK + 2*NCALO + 2*NMU <= MP7_NCHANN);
-    #define HADOFFS 2*NEMCALO
-    #define TKOFFS 2*NCALO+HADOFFS
-    #define MUOFFS 2*NTRACK+TKOFFS
+    #define TKOFFS 0
+    #define MUOFFS 3*NTRACK+TKOFFS
     mp7_pack<NTRACK,TKOFFS>(track, data);
     mp7_pack<NMU,MUOFFS>(mu, data);
 
@@ -197,9 +222,9 @@ void mp7wrapped_unpack_in(MP7DataWord data[MP7_NCHANN], TkObj track[NTRACK], MuO
 
     // unpack inputs
     assert(2*NEMCALO + 2*NTRACK + 2*NCALO + 2*NMU <= MP7_NCHANN);
-    #define HADOFFS 2*NEMCALO
-    #define TKOFFS 2*NCALO+HADOFFS
-    #define MUOFFS 2*NTRACK+TKOFFS
+    #define TKOFFS 0
+    #define MUOFFS 3*NTRACK+TKOFFS
+
     mp7_unpack<NTRACK,TKOFFS>(data, track);
     mp7_unpack<NMU,MUOFFS>(data, mu);
 }
@@ -211,13 +236,10 @@ void mp7wrapped_pack_out( PFChargedObj pfmu[NMU], MP7DataWord data[MP7_NCHANN]) 
 
     // pack outputs
     assert(2*NTRACK + 2*NPHOTON + 2*NSELCALO + 2*NMU <= MP7_NCHANN);
-    #define PHOOFFS 2*NTRACK
-    #define NHOFFS 2*NPHOTON+PHOOFFS
-    #define PFMUOFFS 2*NSELCALO+NHOFFS
+    #define PFMUOFFS 0
 
     for (unsigned int i = 0; i < NMU; ++i) {
-        data[2*i+0+PFMUOFFS] = ( pfmu[i].hwId, pfmu[i].hwPt );
-        data[2*i+1+PFMUOFFS] = ( pfmu[i].hwZ0, pfmu[i].hwPhi, pfmu[i].hwEta );
+        data[2*i+0+PFMUOFFS] = ( pfmu[i].hwPt, pfmu[i].hwEta, pfmu[i].hwPhi );
     }
 
     return;
@@ -230,16 +252,12 @@ void mp7wrapped_unpack_out( MP7DataWord data[MP7_NCHANN], PFChargedObj pfmu[NMU]
 
     // unpack outputs
     assert(2*NTRACK + 2*NPHOTON + 2*NSELCALO + 2*NMU <= MP7_NCHANN);
-    #define PHOOFFS 2*NTRACK
-    #define NHOFFS 2*NPHOTON+PHOOFFS
-    #define PFMUOFFS 2*NSELCALO+NHOFFS
+    #define PFMUOFFS 0
 
     for (unsigned int i = 0; i < NMU; ++i) {
-        pfmu[i].hwPt  = data[2*i+0+PFMUOFFS](15, 0);
-        pfmu[i].hwId  = data[2*i+0+PFMUOFFS](18,16);
-        pfmu[i].hwEta = data[2*i+1+PFMUOFFS](9, 0);
-        pfmu[i].hwPhi = data[2*i+1+PFMUOFFS](19,10);
-        pfmu[i].hwZ0  = data[2*i+1+PFMUOFFS](29,20);
+        pfmu[i].hwPt  = data[2*i+0+PFMUOFFS](28,19);
+        pfmu[i].hwEta = data[2*i+1+PFMUOFFS](19,10);
+        pfmu[i].hwPhi = data[2*i+1+PFMUOFFS](10,0);
     }
 
     return;

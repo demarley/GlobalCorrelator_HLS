@@ -14,6 +14,7 @@ set l1pfIPVersion 2.0
 open_project -reset "proj3-ctp7-full"
 set_top ${l1pfTopFunc}
 add_files firmware/simple_fullpfalgo.cpp -cflags "-DTESTCTP7 -DHLS_pipeline_II=2"
+add_files firmware/prop.cpp -cflags "-DHLS_pipeline_II=2"
 add_files -tb simple_fullpfalgo_test.cpp  -cflags "-DTESTCTP7 -DHLS_pipeline_II=2 -DMP7_TOP_FUNC=${l1pfTopFunc} -DMP7_REF_FUNC=${l1pfRefFunc} -DCTP7_VALIDATE=${l1pfValidate}"
 add_files -tb simple_fullpfalgo_ref.cpp -cflags "-DTESTCTP7"
 add_files -tb utils/pattern_serializer.cpp -cflags "-DTESTCTP7"
